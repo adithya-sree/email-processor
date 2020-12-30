@@ -52,10 +52,10 @@ func main() {
 	// Run Blocking
 	<-c
 	// Exit
-	exit(mqttClient, connectionPool)
+	exit(mqttClient)
 }
 
-func exit(mqttClient mqtt.Client, connectionPool *mail.SmtpConnectionPool) {
+func exit(mqttClient mqtt.Client) {
 	// Exit
 	out.Info("Process is existing, closing connections...")
 	// Disconnect from Broker
