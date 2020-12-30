@@ -126,40 +126,42 @@ func initializeSmtpClient(host, user, pass string, port uint) (*smtp.Client, err
 func getConnection(pool *SmtpConnectionPool, cancel chan int) <-chan *smtp.Client {
 	// Create client channel
 	c := make(chan *smtp.Client, 1)
-	exit := false
-	go func() {
-		// Iterate over channel selects until a connection
-		// is found or the timeout is reached
-		for {
-			select {
-			// If cancel channel received signal exit iteration
-			case <- cancel:
-				exit = true
-			// If no receive operation is available on channel,
-			// attempt to get connection from pool
-			default:
-				// Lock Mutex
-				pool.mu.Lock()
-				if len(pool.connectionPool) >= 1 {
-					// If connection exists, return connection on channel
-					c <- pool.connectionPool[0]
-					// Remove connection from pool
-					pool.connectionPool = remove(pool.connectionPool, 0)
-					// Exit over iteration
-					exit = true
-				}
-				// Unlock Mutex
-				pool.mu.Unlock()
-			}
-			// If timeout is reached or connection is found
-			// break iteration
-			if exit {
-				break
-			}
-		}
-	}()
+	go waitForConnection(pool, cancel, c)
 	// Return client channel
 	return c
+}
+
+func waitForConnection(pool *SmtpConnectionPool, cancel chan int, response chan *smtp.Client) {
+	exit := false
+	// Iterate over channel selects until a connection
+	// is found or the timeout is reached
+	for {
+		select {
+		// If cancel channel received signal exit iteration
+		case <- cancel:
+			exit = true
+		// If no receive operation is available on channel,
+		// attempt to get connection from pool
+		default:
+			// Lock Mutex
+			pool.mu.Lock()
+			if len(pool.connectionPool) >= 1 {
+				// If connection exists, return connection on channel
+				response <- pool.connectionPool[0]
+				// Remove connection from pool
+				pool.connectionPool = remove(pool.connectionPool, 0)
+				// Exit over iteration
+				exit = true
+			}
+			// Unlock Mutex
+			pool.mu.Unlock()
+		}
+		// If timeout is reached or connection is found
+		// break iteration
+		if exit {
+			break
+		}
+	}
 }
 
 func remove(a []*smtp.Client, i int) []*smtp.Client {
